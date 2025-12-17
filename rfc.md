@@ -52,11 +52,12 @@ To achieve maximum header compression, HQFBP mandates the use of short integer k
 | 3 | **Dst-Callsign** | Text String (UTF-8) | OPTIONAL | Intended recipient (may be a broadcast address like QST-0). |
 | 4 | **Content-Format** | Unsigned Integer | OPTIONAL | CoAP Content-Format ID (e.g., 0 for text/plain;charset=UTF-8) [3] . Mutually exclusive with 7. |
 | 5 | **Content-Encoding** | Text String or Array of Text Strings (UTF-8) | OPTIONAL | Compression/Encoding applied to the original file. If an Array, encodings MUST be applied in the order listed. |
-| 6 | **Content-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **original, uncompressed** file content (e.g., SHA-256, CRC32). |
+| 6 | **Repr-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **original, uncompressed** file content (e.g., SHA-256, CRC32). |
 | 7 | **Content-Type** | Text String (UTF-8) | OPTIONAL | Full HTTP-style MIME type (alternative to 4). Mutually exclusive with 4. |
 | 8 | **File-Size** | Unsigned Integer | OPTIONAL | Total size of the original, uncompressed file in bytes. **Required** for chunked transfers. |
 | 9 | **Original-Message-Id** | Unsigned Integer | CONDITIONAL | The Message-Id of the first chunk in a file transfer. Used by receivers for grouping. |
 | 10 | **Total-Chunks** | Unsigned Integer | CONDITIONAL | The total count of chunks in the File Transfer. **Required** for chunked transfers. |
+| 11 | **Content-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **encoded/compressed** payload (e.g., SHA-256, CRC32). |
 
 ### 4.1. Header Defaults
 
@@ -80,7 +81,7 @@ Example: If Chunk-Index is 3 and Total-Chunks is 10, it indicates this is the 4t
 The final, fully decoded header of the reconstructed file MUST be the merge of all distinct header fields received from every chunk.  
 **Merging Rules:**
 
-1. **Consistency Check:** The receiver MUST verify that fields common across all chunks in a file transfer (e.g., Src-Callsign, Content-Digest, File-Size) are consistent. If a discrepancy is detected, the File Transfer is considered corrupted and MUST be discarded, or the station transmitting the inconsistent data should be logged for potential transmission issues.  
+1. **Consistency Check:** The receiver MUST verify that fields common across all chunks in a file transfer (e.g., Src-Callsign, Repr-Digest, File-Size) are consistent. If a discrepancy is detected, the File Transfer is considered corrupted and MUST be discarded, or the station transmitting the inconsistent data should be logged for potential transmission issues.  
 2. **Merge Logic:** For any field other than the core chunking parameters (0, 1, 9, 10, and 8 for payload length/size), the header of the *first* received chunk (Chunk Index 0\) is provisionally considered the complete header. However, if any subsequent chunk contains an optional header field that was *missing* from the first chunk, that field MUST be included in the final merged header.  
    * *Rationale:* This allows for small changes in metadata (e.g., compression method) to be communicated without excessive repetition, while maintaining the robustness of the core fields. In practice, all critical metadata should be present in Chunk 0.
 
@@ -92,18 +93,19 @@ The Content-Encoding (Key 5\) field specifies the compression and/or forward err
 The value of Key 5 MAY be a single Text String or an **Array of Text Strings**. If it is an Array, the encodings MUST be applied sequentially, in the order they appear in the Array. Receivers MUST sequentially undo these encodings in the reverse order.  
 Common values include standard compression schemes like `gzip`, `deflate`, or `lzma`. This field also supports forward error correction (FEC) schemes relevant to noisy radio environments, such as Fountain Codes (e.g., RaptorQ as per IETF RFC 6330 [[2]](https://datatracker.ietf.org/doc/html/rfc6330)), and other erasure codes like **LDPC** or **Reed-Solomon**.
 
-### 6.2. Integrity (Content-Digest)
+### 6.2. Integrity (Repr-Digest and Content-Digest)
 
-The Content-Digest (Key 6\) provides a cryptographic hash or checksum of the **original, uncompressed** file content. Receivers SHOULD use this digest to verify the integrity of the reconstructed file.  
+*   **Repr-Digest (Key 6):** Provides a cryptographic hash or checksum of the **original, uncompressed** file content (Representation Digest). Receivers SHOULD use this digest to verify the integrity of the reconstructed file after decoding.
+*   **Content-Digest (Key 11):** Provides a cryptographic hash or checksum of the **encoded/compressed** payload. Receivers MAY use this to verify the integrity of the payload before decoding key 5.
+
 Common digest algorithms include cryptographic hashes (e.g., `sha256`, `sha1`) where the algorithm is usually implied by the length of the byte string. Additionally, simpler checksums for fast verification are supported, such as `crc32` or `crc16`, where the algorithm is also implied by the known digest length.
 
 ## 7. Addressing (Callsigns)
 
 The Src-Callsign (Key 2\) and Dst-Callsign (Key 3\) fields MUST use standard amateur radio callsigns, optionally appended with an SSID (e.g., \-1 to \-15), separated by a hyphen.
 
-* **Broadcasts:** For broadcasts, the Dst-Callsign may be omitted or set to a reserved broadcast address (e.g., QST-0).  
-* **Encoding:** All callsigns are encoded as UTF-8 text strings within the CBOR map.
-
+*   **Broadcasts:** For broadcasts, the Dst-Callsign may be omitted or set to a reserved broadcast address (e.g., QST-0).  
+*   **Encoding:** All callsigns are encoded as UTF-8 text strings within the CBOR map.
 
 ## 8. References
 
@@ -119,14 +121,9 @@ The Src-Callsign (Key 2\) and Dst-Callsign (Key 3\) fields MUST use standard ama
 ### A.1. Related protocols
 It is foreseen that HQFBP to be used either as a raw frame but also on top of other protocols like AX.25, FX.25, or even UDP. It should be also a proper companion for Bundle Protocol [RFC9171].
 
-### A.2 Message Checksum
-
-A message checksum field is planned for future versions to ensure data integrity. This will be added as a new key in the CBOR map str. See Repr-Digest vs Content-Digest.
-
-### A.3 CBOR full-extent
+### A.2. CBOR full-extent
 
 It is expected to experiment with CBOR only messages, where the entire data and header are encoded as a single CBOR item. This would allow for more efficient extension and reduce overhead. But also it would bring standard CBOSE signing and verification mechanisms into play.
-
 
 
 ## Appendix B. CBOR Encoding Example (Informative)
@@ -152,10 +149,10 @@ Consider a file (4032 bytes, content type text/markdown, compressed with gzip) s
   "0": 1002,                   // Message-Id: 1002  
   "1": 1,                      // Chunk-Index: 1  
   "2": "FOSM-1",               // Src-Callsign  
-  "6": "sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:",           // Content-Digest: (Hash byte string)  
+  "6": "sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:",           // Repr-Digest: (Hash byte string)  
   "9": 1000,                   // Original-Message-Id: 1001  
   "10": 2                      // Total-Chunks: 2  
 }
 ```
 
-The receiver merges these to get the complete metadata for the file transfer, including both Content-Encoding from Chunk 1 and Content-Digest from Chunk 2.
+The receiver merges these to get the complete metadata for the file transfer, including both Content-Encoding from Chunk 1 and Repr-Digest from Chunk 2.
