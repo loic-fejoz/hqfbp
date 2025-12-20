@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-The Hamradio Quick File Broadcasting Protocol (HQFBP) is designed to enable efficient, robust, and asynchronous file and data broadcasting over radio communication links, including challenging environments such as satellite downlink.  
+The Hamradio Quick File Broadcasting Protocol (HQFBP) is designed to enable efficient, robust, and asynchronous file and data broadcasting over radio communication links, including challenging environments such as satellite downlink.
 HQFBP leverages the **Concise Binary Object Representation (CBOR)** (RFC 8949\) for compact and extensible header encoding, optimizing overhead for low-bandwidth digital radio channels. The protocol is inherently delay-tolerant and supports large file transmission via mandatory chunking and header reconstruction mechanisms.
 
 ### 1.1. Goals
@@ -47,17 +47,18 @@ To achieve maximum header compression, HQFBP mandates the use of short integer k
 | CBOR Key (Integer) | Header Field Name | Data Type | Requirement | Default Value / Notes |
 | :---- | :---- | :---- | :---- | :---- |
 | 0 | **Message-Id** | Unsigned Integer | MANDATORY | A strictly increasing counter for all messages sent by a single originator. |
-| 1 | **Chunk-Index** | Unsigned Integer | CONDITIONAL | The sequential number of the current chunk (0-based). **Required** for chunked transfers. |
-| 2 | **Src-Callsign** | Text String (UTF-8) | OPTIONAL | Originating station's Callsign-SSID. |
-| 3 | **Dst-Callsign** | Text String (UTF-8) | OPTIONAL | Intended recipient (may be a broadcast address like QST-0). |
-| 4 | **Content-Format** | Unsigned Integer | OPTIONAL | CoAP Content-Format ID (e.g., 0 for text/plain;charset=UTF-8) [3] . Mutually exclusive with 7. |
-| 5 | **Content-Encoding** | Text String or Array of Text Strings (UTF-8) | OPTIONAL | Compression/Encoding applied to the original file. If an Array, encodings MUST be applied in the order listed. |
+| 1 | **Src-Callsign** | Text String (UTF-8) | OPTIONAL | Originating station's Callsign-SSID. |
+| 2 | **Dst-Callsign** | Text String (UTF-8) | OPTIONAL | Intended recipient (may be a broadcast address like QST-0). |
+| 3 | **Content-Format** | Unsigned Integer | OPTIONAL | CoAP Content-Format ID (e.g., 0 for text/plain;charset=UTF-8) [3] . Mutually exclusive with 5. |
+| 4 | **Content-Type** | Text String (UTF-8) | OPTIONAL | Full HTTP-style MIME type (alternative to 4). Mutually exclusive with 4. |
+| 5 | **Content-Encoding** | Text String or Array of Text Strings (UTF-8) | OPTIONAL | Compression/Encoding applied to the original file or chunk. If an Array, encodings MUST be applied in the order listed. |
 | 6 | **Repr-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **original, uncompressed** file content (e.g., SHA-256, CRC32). |
-| 7 | **Content-Type** | Text String (UTF-8) | OPTIONAL | Full HTTP-style MIME type (alternative to 4). Mutually exclusive with 4. |
+| 7 | **Content-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **encoded/compressed** payload (e.g., SHA-256, CRC32). |
 | 8 | **File-Size** | Unsigned Integer | OPTIONAL | Total size of the original, uncompressed file in bytes. **Required** for chunked transfers. |
-| 9 | **Original-Message-Id** | Unsigned Integer | CONDITIONAL | The Message-Id of the first chunk in a file transfer. Used by receivers for grouping. |
-| 10 | **Total-Chunks** | Unsigned Integer | CONDITIONAL | The total count of chunks in the File Transfer. **Required** for chunked transfers. |
-| 11 | **Content-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **encoded/compressed** payload (e.g., SHA-256, CRC32). |
+| 9 | **Chunk-Index** | Unsigned Integer | CONDITIONAL | The sequential number of the current chunk (0-based). **Required** for chunked transfers. |
+| 10 | **Original-Message-Id** | Unsigned Integer | CONDITIONAL | The Message-Id of the first chunk in a file transfer. Used by receivers for grouping. |
+| 11 | **Total-Chunks** | Unsigned Integer | CONDITIONAL | The total count of chunks in the File Transfer. **Required** for chunked transfers. |
+
 
 ### 4.1. Header Defaults
 
@@ -78,12 +79,13 @@ Example: If Chunk-Index is 3 and Total-Chunks is 10, it indicates this is the 4t
 
 ### 5.2. Header Merging (Reconstruction)
 
-The final, fully decoded header of the reconstructed file MUST be the merge of all distinct header fields received from every chunk.  
+The final, fully decoded header of the reconstructed file MUST be the merge of all distinct header fields received from every chunk, with the exception of the core chunking parameters (0, 1, 10, and 8 for payload length/size).
+
 **Merging Rules:**
 
 1. **Consistency Check:** The receiver MUST verify that fields common across all chunks in a file transfer (e.g., Src-Callsign, Repr-Digest, File-Size) are consistent. If a discrepancy is detected, the File Transfer is considered corrupted and MUST be discarded, or the station transmitting the inconsistent data should be logged for potential transmission issues.  
-2. **Merge Logic:** For any field other than the core chunking parameters (0, 1, 9, 10, and 8 for payload length/size), the header of the *first* received chunk (Chunk Index 0\) is provisionally considered the complete header. However, if any subsequent chunk contains an optional header field that was *missing* from the first chunk, that field MUST be included in the final merged header.  
-   * *Rationale:* This allows for small changes in metadata (e.g., compression method) to be communicated without excessive repetition, while maintaining the robustness of the core fields. In practice, all critical metadata should be present in Chunk 0.
+2. **Merge Logic:** For any field other than the core chunking parameters (0, 1, 10, and 8 for payload length/size), the header of the *first* received chunk (Chunk Index 0\) is provisionally considered the complete header. However, if any subsequent chunk contains an optional header field that was *missing* from the first chunk, that field MUST be included in the final merged header.  
+   * *Rationale:* This allows for small changes in metadata (e.g., compression method) to be communicated without excessive repetition, while maintaining the robustness of the core fields. In practice, all *critical* metadata should be present in Chunk 0.
 
 ## 6. Compression and Integrity
 
@@ -91,7 +93,35 @@ The final, fully decoded header of the reconstructed file MUST be the merge of a
 
 The Content-Encoding (Key 5\) field specifies the compression and/or forward error correction (FEC) algorithm applied to the original data *before* chunking.  
 The value of Key 5 MAY be a single Text String or an **Array of Text Strings**. If it is an Array, the encodings MUST be applied sequentially, in the order they appear in the Array. Receivers MUST sequentially undo these encodings in the reverse order.  
-Common values include standard compression schemes like `gzip`, `deflate`, or `lzma`. This field also supports forward error correction (FEC) schemes relevant to noisy radio environments, such as Fountain Codes (e.g., RaptorQ as per IETF RFC 6330 [[2]](https://datatracker.ietf.org/doc/html/rfc6330)), and other erasure codes like **LDPC** or **Reed-Solomon**.
+Common values include standard compression schemes like `gzip`, `deflate`, or `lzma`. This field also supports forward error correction (FEC) schemes relevant to noisy radio environments, such as Fountain Codes (e.g., RaptorQ as per IETF RFC 6330 [[2]](https://datatracker.ietf.org/doc/html/rfc6330)), and other erasure codes like **LDPC** or **Reed-Solomon** (eg `rs(255,233)`).
+
+To minimize overhead, well-known encodings SHOULD use their assigned integer values.
+
+#### 6.1.1. Well-Known Encoding Registry
+
+| Integer Value | Algorithm Name | Description |
+| :--- | :--- | :--- |
+| -1 | h (Boundary) | Header Boundary Marker. See Section 6.1.2. |
+| 0 | identity | No encoding applied. |
+| 1 | gzip | Gzip compression (RFC 1952). |
+| 2 | deflate | Deflate compression (RFC 1951). |
+| 3 | br | Brotli compression. |
+
+#### 6.1.2. The Header Boundary Marker (-1)
+
+The integer `-1` (represented as `"h"` in documentation) acts as a structural boundary in the encoding array:
+
+Pre-Boundary: Encodings applied only to the File Payload before protocol encapsulation.
+
+Post-Boundary: Encodings applied to the HQFBP Message (Header + Payload).
+
+If -1 is present, the receiver MUST process post-boundary encodings (right-to-left) to reach the CBOR header, then use the header metadata to process pre-boundary encodings.
+
+Example: `[1, -1, 20]` implies:
+
+1. Calculate/Verify `crc32` (20) over the entire packet.
+2. Remove `crc32` to reveal the CBOR Header.
+3. Apply `gzip` (1) to the payload.
 
 ### 6.2. Integrity (Repr-Digest and Content-Digest)
 
