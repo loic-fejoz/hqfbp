@@ -1,5 +1,13 @@
 # Hamradio Quick File Broadcasting Protocol (HQFBP) Specification
 
+
+# Status of This Memo
+
+| Status | Draft |
+| :--- | :--- |
+| Version | 0.1 |
+
+
 ## 1. Introduction
 
 The Hamradio Quick File Broadcasting Protocol (HQFBP) is designed to enable efficient, robust, and asynchronous file and data broadcasting over radio communication links, including challenging environments such as satellite downlink.
@@ -163,13 +171,13 @@ Consider a file (4032 bytes, content type text/markdown, compressed with gzip) s
 ```json
 {  
   "0": 1001,                   // Message-Id: 1001  
-  "1": 0,                      // Chunk-Index: 0  
-  "2": "FOSM-1",               // Src-Callsign of the satellite  
+  "9": 0,                      // Chunk-Index: 0  
+  "1": "FOSM-1",               // Src-Callsign of the satellite  
   "5": "gzip",                 // Content-Encoding: gzip  
-  "7": "text/markdown",            // Content-Type: text/markdown  
+  "4": "text/markdown",            // Content-Type: text/markdown  
   "8": 4032,                   // File-Size (Original)  
-  "9": 1001,                   // Original-Message-Id: 1001  
-  "10": 2                      // Total-Chunks: 2  
+  "10": 1001,                   // Original-Message-Id: 1001  
+  "11": 2                      // Total-Chunks: 2  
 }
 ```
 
@@ -177,11 +185,11 @@ Consider a file (4032 bytes, content type text/markdown, compressed with gzip) s
 ```json
 {  
   "0": 1002,                   // Message-Id: 1002  
-  "1": 1,                      // Chunk-Index: 1  
-  "2": "FOSM-1",               // Src-Callsign  
-  "6": "sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:",           // Repr-Digest: (Hash byte string)  
-  "9": 1000,                   // Original-Message-Id: 1001  
-  "10": 2                      // Total-Chunks: 2  
+  "9": 1,                      // Chunk-Index: 1  
+  "1": "FOSM-1",               // Src-Callsign  
+  "7": "sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:",           // Repr-Digest: (Hash byte string)  
+  "10": 1000,                   // Original-Message-Id: 1001  
+  "11": 2                      // Total-Chunks: 2  
 }
 ```
 
