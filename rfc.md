@@ -1,12 +1,10 @@
 # Hamradio Quick File Broadcasting Protocol (HQFBP) Specification
 
-
-# Status of This Memo
+## Status of This Memo
 
 | Status | Draft |
 | :--- | :--- |
 | Version | 0.1 |
-
 
 ## 1. Introduction
 
@@ -32,6 +30,10 @@ HQFBP leverages the **Concise Binary Object Representation (CBOR)** (RFC 8949\) 
 * **Receiver:** An amateur radio station capable of receiving and decoding HQFBP Messages.  
 * **Callsign-SSID:** A station identifier formatted as a UTF-8 string, optionally including the Secondary Station Identifier (SSID) (e.g., W1AW, W1AW-7).
 
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and
+"OPTIONAL" in this document are to be interpreted as described in
+[RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
 
 ### 2.1. MIME Type Registration
 
@@ -63,10 +65,9 @@ To achieve maximum header compression, HQFBP mandates the use of short integer k
 | 6 | **Repr-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **original, uncompressed** file content (e.g., SHA-256, CRC32). |
 | 7 | **Content-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **encoded/compressed** payload (e.g., SHA-256, CRC32). |
 | 8 | **File-Size** | Unsigned Integer | OPTIONAL | Total size of the original, uncompressed file in bytes. **Required** for chunked transfers. |
-| 9 | **Chunk-Index** | Unsigned Integer | CONDITIONAL | The sequential number of the current chunk (0-based). **Required** for chunked transfers. |
+| 9 | **Chunk-Id** | Unsigned Integer | CONDITIONAL | The sequential number of the current chunk (0-based). **Required** for chunked transfers. |
 | 10 | **Original-Message-Id** | Unsigned Integer | CONDITIONAL | The Message-Id of the first chunk in a file transfer. Used by receivers for grouping. |
 | 11 | **Total-Chunks** | Unsigned Integer | CONDITIONAL | The total count of chunks in the File Transfer. **Required** for chunked transfers. |
-
 
 ### 4.1. Header Defaults
 
@@ -78,12 +79,13 @@ When transmitting a file that exceeds the maximum payload size of the underlying
 
 ### 5.1. Chunk Identification
 
-When chunking is used, the following fields are **MANDATORY**: 1 (Chunk-Index), 10 (Total-Chunks), 8 (File-Size), and 9 (Original-Message-Id).
+When chunking is used, the following fields are **MANDATORY**: Chunk-Id, Total-Chunks, and Original-Message-Id.
+File-Size SHOULD be transmitted.
 
-* **Chunk-Index (Key 1):** MUST be the sequential number of the current chunk (0-based).  
-* **Total-Chunks (Key 10):** MUST be the total count of chunks that constitute the complete file.
+* **Chunk-Id:** MUST be the sequential number of the current chunk (0-based).  
+* **Total-Chunks:** MUST be the total count of chunks that constitute the complete file.
 
-Example: If Chunk-Index is 3 and Total-Chunks is 10, it indicates this is the 4th chunk out of 10 total chunks.
+Example: If Chunk-Id is 3 and Total-Chunks is 10, it indicates this is the 4th chunk out of 10 total chunks.
 
 ### 5.2. Header Merging (Reconstruction)
 
@@ -99,9 +101,9 @@ The final, fully decoded header of the reconstructed file MUST be the merge of a
 
 ### 6.1. Compression (Content-Encoding)
 
-The Content-Encoding (Key 5\) field specifies the compression and/or forward error correction (FEC) algorithm applied to the original data *before* chunking.  
-The value of Key 5 MAY be a single Text String or an **Array of Text Strings**. If it is an Array, the encodings MUST be applied sequentially, in the order they appear in the Array. Receivers MUST sequentially undo these encodings in the reverse order.  
-Common values include standard compression schemes like `gzip`, `deflate`, or `lzma`. This field also supports forward error correction (FEC) schemes relevant to noisy radio environments, such as Fountain Codes (e.g., RaptorQ as per IETF RFC 6330 [[2]](https://datatracker.ietf.org/doc/html/rfc6330)), and other erasure codes like **LDPC** or **Reed-Solomon** (eg `rs(255,233)`).
+The Content-Encoding field specifies the compression and/or forward error correction (FEC) algorithm applied to the original data *before* and/or *after* chunking.  
+The value of Content-Encoding MAY be a single Text String or an **Array of Text Strings**. If it is an Array, the encodings MUST be applied sequentially, in the order they appear in the Array. Receivers MUST sequentially undo these encodings in the reverse order.  
+Common values include standard compression schemes like `gzip`, `deflate`, `br`, or `lzma`. This field also supports forward error correction (FEC) schemes relevant to noisy radio environments, such as Fountain Codes (e.g., RaptorQ as per IETF RFC 6330 [[2]](https://datatracker.ietf.org/doc/html/rfc6330)), and other erasure codes like **LDPC** or **Reed-Solomon** (eg `rs(255,233)`).
 
 To minimize overhead, well-known encodings SHOULD use their assigned integer values.
 
@@ -114,6 +116,9 @@ To minimize overhead, well-known encodings SHOULD use their assigned integer val
 | 1 | gzip | Gzip compression (RFC 1952). |
 | 2 | deflate | Deflate compression (RFC 1951). |
 | 3 | br | Brotli compression. |
+| 4 | lzma | Lempel-Ziv-Markov chain algorithm compression. |
+| 5 | crc16 | 16bits cyclic redundancy check appended after data |
+| 6 | crc32 | 32bits cyclic redundancy check appended after data |
 
 #### 6.1.2. The Header Boundary Marker (-1)
 
@@ -131,19 +136,24 @@ Example: `[1, -1, 20]` implies:
 2. Remove `crc32` to reveal the CBOR Header.
 3. Apply `gzip` (1) to the payload.
 
+In case of non-transparent encoding, the transmitter MUST:
+
+* either publish publicly the encoding ahead of emission time (eg. well-known satellite downlink),
+* or emit a frame containing the header in a preliminary frame whose `Content-Type` is `application/vnd.hqfbp+cbor` so that the decoder know how to decode the chunks.
+
 ### 6.2. Integrity (Repr-Digest and Content-Digest)
 
-*   **Repr-Digest (Key 6):** Provides a cryptographic hash or checksum of the **original, uncompressed** file content (Representation Digest). Receivers SHOULD use this digest to verify the integrity of the reconstructed file after decoding.
-*   **Content-Digest (Key 11):** Provides a cryptographic hash or checksum of the **encoded/compressed** payload. Receivers MAY use this to verify the integrity of the payload before decoding key 5.
+* **Repr-Digest:** Provides a cryptographic hash or checksum of the **original, uncompressed** file content (Representation Digest). Receivers SHOULD use this digest to verify the integrity of the reconstructed file after decoding.
+* **Content-Digest:** Provides a cryptographic hash or checksum of the **encoded/compressed** payload. Receivers MAY use this to verify the integrity of the payload before decoding.
 
 Common digest algorithms include cryptographic hashes (e.g., `sha256`, `sha1`) where the algorithm is usually implied by the length of the byte string. Additionally, simpler checksums for fast verification are supported, such as `crc32` or `crc16`, where the algorithm is also implied by the known digest length.
 
 ## 7. Addressing (Callsigns)
 
-The Src-Callsign (Key 2\) and Dst-Callsign (Key 3\) fields MUST use standard amateur radio callsigns, optionally appended with an SSID (e.g., \-1 to \-15), separated by a hyphen.
+The Src-Callsign and Dst-Callsign fields MUST use standard amateur radio callsigns, optionally appended with an SSID (e.g., \-1 to \-15), separated by a hyphen.
 
-*   **Broadcasts:** For broadcasts, the Dst-Callsign may be omitted or set to a reserved broadcast address (e.g., QST-0).  
-*   **Encoding:** All callsigns are encoded as UTF-8 text strings within the CBOR map.
+* **Broadcasts:** For broadcasts, the Dst-Callsign may be omitted or set to a reserved broadcast address (e.g., QST-0).  
+* **Encoding:** All callsigns are encoded as UTF-8 text strings within the CBOR map.
 
 ## 8. References
 
@@ -157,21 +167,22 @@ The Src-Callsign (Key 2\) and Dst-Callsign (Key 3\) fields MUST use standard ama
 ## Appendix A. Future Extensions (Informative)
 
 ### A.1. Related protocols
+
 It is foreseen that HQFBP to be used either as a raw frame but also on top of other protocols like AX.25, FX.25, or even UDP. It should be also a proper companion for Bundle Protocol [RFC9171].
 
 ### A.2. CBOR full-extent
 
 It is expected to experiment with CBOR only messages, where the entire data and header are encoded as a single CBOR item. This would allow for more efficient extension and reduce overhead. But also it would bring standard CBOSE signing and verification mechanisms into play.
 
-
 ## Appendix B. CBOR Encoding Example (Informative)
 
 Consider a file (4032 bytes, content type text/markdown, compressed with gzip) split into two chunks.  
 **Chunk 1 (Index 0 of 2):**
+
 ```json
 {  
   "0": 1001,                   // Message-Id: 1001  
-  "9": 0,                      // Chunk-Index: 0  
+  "9": 0,                      // Chunk-Id: 0  
   "1": "FOSM-1",               // Src-Callsign of the satellite  
   "5": "gzip",                 // Content-Encoding: gzip  
   "4": "text/markdown",            // Content-Type: text/markdown  
@@ -182,10 +193,11 @@ Consider a file (4032 bytes, content type text/markdown, compressed with gzip) s
 ```
 
 **Chunk 2 (Index 1 of 2):**
+
 ```json
 {  
   "0": 1002,                   // Message-Id: 1002  
-  "9": 1,                      // Chunk-Index: 1  
+  "9": 1,                      // Chunk-Id: 1  
   "1": "FOSM-1",               // Src-Callsign  
   "7": "sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:",           // Repr-Digest: (Hash byte string)  
   "10": 1000,                   // Original-Message-Id: 1001  
@@ -194,3 +206,48 @@ Consider a file (4032 bytes, content type text/markdown, compressed with gzip) s
 ```
 
 The receiver merges these to get the complete metadata for the file transfer, including both Content-Encoding from Chunk 1 and Repr-Digest from Chunk 2.
+
+## Appendix C. The Bootstrap Sequence for Encapsulated Encodings (Informative)
+
+When a transmission uses "non-transparent" encodings (where the CBOR header itself is wrapped in an encoding like Reed-Solomon or LDPC), a receiver cannot parse the header to discover how to decode the packet.
+
+To resolve this, HQFBP uses a Bootstrap Sequence: a "Transparent Announcement" followed by "Encapsulated Data."
+
+### C.1. Step 1: The Transparent Announcement (Message 1001)
+
+This message is sent using standard transparent CBOR. Its payload contains the specific header metadata required to decode the next message(s).
+
+| Field |	Value |	Role |
+|-|-|-|
+| Header: Message-Id |	1001 |	The ID of the announcement itself.|
+| Header: Content-Type | application/vnd.hqfbp+cbor |	Tells the receiver: "The payload is a header for a future message." |
+| Payload (CBOR Map)	| ```{0: 1002, 5: [-1, "ldpc", "rs(255,233)"]}``` |Metadata for the upcoming Message 1002. |
+
+### C.2. Step 2: The Encapsulated File Transfer (Message 1002)
+
+Now that the receiver knows the parameters for ID 1002, the transmitter sends the file in chunks. Each chunk is "wrapped" in the FEC layers.
+
+**Chunk 0 (The first segment):**
+
+* Physical Layer: `[LDPC( RS( CBOR_HEADER + DATA_PART_1 ) )]`
+* Header (Visible only after FEC decoding):
+```json
+    {
+      "0": 1002,            // Message-Id matches the Announcement
+      "9": 0,               // Chunk-Id (0-based)
+      "10": 1002,           // Original-Message-Id
+      "11": 2               // Total-Chunks
+    }
+```
+
+**Chunk 1 (The second segment):**
+
+* Physical Layer: `[LDPC( RS( CBOR_HEADER + DATA_PART_2 ) )]`
+* Header:
+```json
+{
+  "0": 1003,            // Unique Message-Id
+  "9": 1,               // Chunk-Id 1
+  "10": 1002            // Links back to the start of the transfer
+}
+```
