@@ -4,7 +4,7 @@
 
 | Status | Draft |
 | :--- | :--- |
-| Version | 0.1 |
+| Version | 0.2 |
 
 ## 1. Introduction
 
@@ -68,6 +68,7 @@ To achieve maximum header compression, HQFBP mandates the use of short integer k
 | 9 | **Chunk-Id** | Unsigned Integer | CONDITIONAL | The sequential number of the current chunk (0-based). **Required** for chunked transfers. |
 | 10 | **Original-Message-Id** | Unsigned Integer | CONDITIONAL | The Message-Id of the first chunk in a file transfer. Used by receivers for grouping. |
 | 11 | **Total-Chunks** | Unsigned Integer | CONDITIONAL | The total count of chunks in the File Transfer. **Required** for chunked transfers. |
+| 12 | **Payload-Size** | Unsigned Integer | OPTIONAL | The exact size of the payload in bytes after all pre-boundary encodings are removed. Used to trim padding added by FEC schemes. |
 
 ### 4.1. Header Defaults
 
@@ -89,13 +90,15 @@ Example: If Chunk-Id is 3 and Total-Chunks is 10, it indicates this is the 4th c
 
 ### 5.2. Header Merging (Reconstruction)
 
-The final, fully decoded header of the reconstructed file MUST be the merge of all distinct header fields received from every chunk, with the exception of the core chunking parameters (0, 1, 10, and 8 for payload length/size).
+The final, fully decoded header of the reconstructed file MUST be the merge of all distinct header fields received from every chunk, with the exception of the core chunking parameters (0, 9, 10, 11).
 
 **Merging Rules:**
 
-1. **Consistency Check:** The receiver MUST verify that fields common across all chunks in a file transfer (e.g., Src-Callsign, Repr-Digest, File-Size) are consistent. If a discrepancy is detected, the File Transfer is considered corrupted and MUST be discarded, or the station transmitting the inconsistent data should be logged for potential transmission issues.  
-2. **Merge Logic:** For any field other than the core chunking parameters (0, 1, 10, and 8 for payload length/size), the header of the *first* received chunk (Chunk Index 0\) is provisionally considered the complete header. However, if any subsequent chunk contains an optional header field that was *missing* from the first chunk, that field MUST be included in the final merged header.  
-   * *Rationale:* This allows for small changes in metadata (e.g., compression method) to be communicated without excessive repetition, while maintaining the robustness of the core fields. In practice, all *critical* metadata should be present in Chunk 0.
+1. **Consistency Check:** The receiver MUST verify that fields common across all chunks in a file transfer (e.g., Src-Callsign, Repr-Digest, File-Size) are consistent. If a discrepancy is detected, the File Transfer is considered corrupted and MUST be discarded.
+2. **Mandatory Markers:** Reassembly markers such as `chunk()`, `repeat()`, or `rq()` MUST be present in the `Content-Encoding` array for proper reassembly.
+3. **Payload Trimming:** If `Payload-Size` (12) is present in any chunk, it MUST be used to trim the payload of that specific PDU after post-boundary decodings. Trimming is the process of removing padding required at reassembly or transmission time (e.g., to align with FEC block sizes).
+4. **Merge Logic:** For any field other than the core chunking parameters, the header of the *first* received chunk (Chunk Index 0) is provisionally considered the complete header. However, if any subsequent chunk contains an optional header field that was *missing* from the first chunk, that field MUST be included in the final merged header.
+   * *Rationale:* This allows for small changes in metadata to be communicated without excessive repetition. In practice, all *critical* metadata should be present in Chunk 0.
 
 ## 6. Compression and Integrity
 
@@ -119,6 +122,12 @@ To minimize overhead, well-known encodings SHOULD use their assigned integer val
 | 4 | lzma | Lempel-Ziv-Markov chain algorithm compression. |
 | 5 | crc16 | 16bits cyclic redundancy check appended after data |
 | 6 | crc32 | 32bits cyclic redundancy check appended after data |
+| - | rs(n,k) | Reed-Solomon Error Correction. |
+| - | rq(l,m,r) | RaptorQ (RFC 6330) with length `l`, MTU `m`, and repair `r`. |
+| - | conv(k,r) | Convolutional coding with constraint `k` and rate `r`. |
+| - | scr(poly) | Additive Scrambler using given LFSR polynomial mask. |
+| - | chunk(s) | Reassembly Marker: Chunk with size `s`. |
+| - | repeat(k) | Reassembly Marker: Simple repetition `k` times. |
 
 #### 6.1.2. The Header Boundary Marker (-1)
 
@@ -147,6 +156,16 @@ In case of non-transparent encoding, the transmitter MUST:
 * **Content-Digest:** Provides a cryptographic hash or checksum of the **encoded/compressed** payload. Receivers MAY use this to verify the integrity of the payload before decoding.
 
 Common digest algorithms include cryptographic hashes (e.g., `sha256`, `sha1`) where the algorithm is usually implied by the length of the byte string. Additionally, simpler checksums for fast verification are supported, such as `crc32` or `crc16`, where the algorithm is also implied by the known digest length.
+
+## 6.3. Hybrid ARQ and Quality Metrics
+
+Receivers SHOULD implement Hybrid ARQ logic to improve reliability in noisy environments. One common approach is **Best-of-N Selection**:
+
+* When multiple copies of the same PDU (identified by Message-Id and Chunk-Id) are received, the receiver SHOULD track a "quality metric" for each.
+* Quality can be derived from checksum verification (success/fail) or error correction metrics (e.g., fewer bit flips corrected in Viterbi/RS decoding).
+* The version with the highest quality metric SHOULD be stored and used for reassembly.
+
+For iterative codes or symbolic reassembly (like RaptorQ), the receiver SHOULD accumulate enough distinct symbols/packets to satisfy the decoding requirements specified in the `Content-Encoding` parameters.
 
 ## 7. Addressing (Callsigns)
 
