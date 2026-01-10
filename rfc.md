@@ -181,7 +181,7 @@ The Src-Callsign and Dst-Callsign fields MUST use standard amateur radio callsig
 [2]
 **IETF RFC 6330 (RaptorQ):** A. Shokrollahi; S. V. A. B. Hartenstein; J. P. K. Hartenstein. *RaptorQ Forward Error Correction Scheme for Object Delivery*. August 2011.  
 [3]
-**CoAP Content-Formats:** Defined by the IANA CoAP Content-Formats Registry.
+**CoAP Content-Formats:** Defined by the IANA CoAP Content-Formats Registry (RFC 7252, RFC 9176). See https://www.iana.org/assignments/core-parameters/core-parameters.xhtml#content-formats
 
 ## Appendix A. Future Extensions (Informative)
 
@@ -203,10 +203,10 @@ Consider a file (4032 bytes, content type text/markdown, compressed with gzip) s
   "0": 1001,                   // Message-Id: 1001  
   "9": 0,                      // Chunk-Id: 0  
   "1": "FOSM-1",               // Src-Callsign of the satellite  
-  "5": "gzip",                 // Content-Encoding: gzip  
-  "4": "text/markdown",            // Content-Type: text/markdown  
+  "5": 1,                      // Content-Encoding: gzip  
+  "4": "text/markdown",        // Content-Type: text/markdown  
   "8": 4032,                   // File-Size (Original)  
-  "10": 1001,                   // Original-Message-Id: 1001  
+  "10": 1001,                  // Original-Message-Id: 1001  
   "11": 2                      // Total-Chunks: 2  
 }
 ```
@@ -219,7 +219,7 @@ Consider a file (4032 bytes, content type text/markdown, compressed with gzip) s
   "9": 1,                      // Chunk-Id: 1  
   "1": "FOSM-1",               // Src-Callsign  
   "7": "sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:",           // Repr-Digest: (Hash byte string)  
-  "10": 1000,                   // Original-Message-Id: 1001  
+  "10": 1001,                  // Original-Message-Id: 1001  
   "11": 2                      // Total-Chunks: 2  
 }
 ```

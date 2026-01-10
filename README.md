@@ -20,6 +20,7 @@ To help radio amateurs understand where HQFBP fits in the ecosystem, here is how
 | **SSDV** | Image Broadcasting | **General Purpose:** SSDV is excellent but specialized for images. HQFBP is content-agnostic; it can transfer images, text, binary binaries, or any other file type with equal efficiency, supporting optional compression and digests. |
 | **PACTOR** | Connected Mode / ARQ | **Broadcast (Connectionless):** PACTOR is primarily a connected mode protocol (Auto-Repeat Request), requiring a handshake. HQFBP is a **broadcasting** protocol (FEC/Erasure coding supported), meaning one station transmits and *many* can receive simultaneously without a back-channel. |
 | **WINLINK** | Email / Message System | **Transport Layer:** Winlink is a full global email system. HQFBP is a lighter-weight **transport layer** focused on the efficient delivery of a single file or message. HQFBP could theoretically be used as a transport *for* a system like Winlink. |
+| **PACSAT** | File Broadcasting (AX.25/UI) | **Modern Evolution:** PACSAT (PFT) pioneered file broadcasting for early Microsats using AX.25 UI frames. HQFBP evolves this by being transport-agnostic, using CBOR for extensible, high-efficiency headers and supporting modern erasure coding (RaptorQ/RS) for better recovery without a back-channel. |
 
 ## 🚀 Key Features
 
