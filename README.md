@@ -29,6 +29,13 @@ To help radio amateurs understand where HQFBP fits in the ecosystem, here is how
 *   **Robust:** Supports chunking for large files and robust header reconstruction.
 *   **Flexible:** Optional compression (gzip, etc.) and integrity checks (CRC32, SHA256, etc.).
 
+## 🛠️ Implementations
+
+* 🐍 [py-hqfbp](https://github.com/loic-fejoz/py-hqfbp) -- The Python reference implementation also used for testing and prototyping.
+* 🦀 [hqfbp-rs](https://github.com/loic-fejoz/hqfbp-rs) -- The Rust implementation used for the FOSM-1 payload.
+
+Both have a simulator to stress-test the protocol under various bit error rate (BER) conditions of the communication link. They also have utility tools to send/receive files by connecting to a KISS-over-tcp server, like Direwolf and FLDIGI.
+
 ## License
 
 See [LICENSE](./LICENSE) for details.
