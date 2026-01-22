@@ -1,279 +1,210 @@
-# Hailing Frequency and Modulation Announcement Protocol
+# Hailing Frequency and Modulation Announcement Protocol based on HQFBP
 
-This document defines a standard encoding description for announcing communication parameters (frequency, modulation, protocol stack) in amateur radio contexts.
-The philosophy is **explicit decomposition**: composite modes (like "Olivia" or "G3RUH") are broken down into their constituent layers (Framing, Scrambling, Modulation, RF).
+**Status:** Draft / Complementary Specification for HQFBP  
+**Date:** 2026-01-22
 
-## Relationship to HQFBP
+## 1. Introduction & Scope
 
-This document defines the descriptor syntax used in HQFBP announcement 
-messages (see [HQFBP RFC](rfc.md) Appendix C). The descriptors are transmitted in 
-the `Content-Encoding` field (CBOR key 5) of transparent announcement 
-messages, enabling receivers to configure their protocol stack for 
-subsequent data reception.
+This document defines the **Standard Descriptor Syntax** used within the **Hamradio Quick File Broadcasting Protocol (HQFBP)**.
+
+Specifically, it defines the values used in the `Content-Encoding` (CBOR Key 5) header field of HQFBP Announcement Messages (as defined in HQFBP RFC Appendix C). These descriptors allow a transmitter to announce a complete, precise, and machine-readable description of the radio protocol stack—from the Application layer down to the Physical RF layer—enabling receivers to automatically configure their demodulation and decoding chains.
+
+While designed for HQFBP, this descriptor syntax is generic and philosophies of **Explicit Decomposition** make it suitable for describing any amateur radio digital mode.
+
+### 1.1. The Philosophy: Explicit Decomposition
+
+Traditional amateur radio modes are often named as monolithic entities (e.g., "Packet Radio", "FT8", "Olivia"). This specification breaks these composite modes down into their constituent layers:
+
+1.  **Application / Protocol Layer**: The high-level framing (e.g., HQFBP, AX.25).
+2.  **Coding / FEC / Scrambling**: Data manipulation before modulation (e.g., Reed-Solomon, Scrambling).
+3.  **Modulation**: The intrinsic conversion of bits to symbols (e.g., FSK, BPSK).
+4.  **RF Transport**: The carrier method (e.g., FM, USB).
+5.  **Physical Parameters**: Center frequency, bandwidth.
+
+## 2. Descriptor Syntax & Registry
+
+The announcement string is a sequential list (JSON/CBOR Array) of descriptors ordered from **Top (Application)** to **Bottom (Physical)**.
+
+### 2.1. Layer 2 to 7: Application & Protocol Framing
+
+Tags describing the high-level format or link-layer protocol.
+
+| Descriptor | Description | Reference |
+| :--- | :--- | :--- |
+| `h` | HQFBP Protocol | [HQFBP RFC](rfc.md) |
+| `aprs` | Automatic Packet Reporting System | APRS Spec 1.0 |
+| `ax.25` | AX.25 Link Layer Framing | AX.25 2.2 |
+| `ccsds` | CCSDS Space Data Link Protocols | TM/TC/AOS |
+| `mobitex` | Mobitex Wireless Data Framing | - |
+| `ft8` | WSJT-X FT8 Framing | WSJT-X |
+| `js8` | JS8Call Framing | JS8Call |
+| `winlink` | Winlink / RMS | - |
+| `pocsag` | POCSAG Paging Protocol | - |
+| `psk31` | PSK31 / Varicode Framing | - |
+| `rtty` | RTTY / Baudot Framing | - |
+| `usp` | U482C / Simple Protocol | GOMspace |
+
+### 2.2. Layer 1.5: Coding, FEC, Scrambling & Framing
+
+Operations on the bit/symbol stream.
+
+| Descriptor | Description | Parameters & Examples |
+| :--- | :--- | :--- |
+| `rs(n, k)` | Reed-Solomon FEC | Block `n`, Data `k`. `rs(255, 223)` |
+| `ldpc(n, k)` | LDPC FEC | `ldpc(174, 87)` |
+| `rq(l, m, r)` | RaptorQ (RFC 6330) | Source `l`, MTU `m`, Repair `r`. `rq(1024, 16, 0)` |
+| `conv(k, r)` | Convolutional Coding | Constraint `k`, Rate `r`. `conv(7, 1/2)` |
+| `golay` | Golay(24,12) | `golay` |
+| `crc(n)` | Cyclic Redundancy Check | `n` bits. `crc(16)`, `crc(32)`, `crc(14)` |
+| `scr(p, [i])` | Additive Scrambler | Poly `p` (hex/name), Init `i` (optional). `scr(g3ruh)`, `scr(ccsds)` |
+| `asm(w)` | Attached Sync Marker | `w` (hex) or default CCSDS. `asm(0x1ACFFC1D)` |
+| `interleave(d)`| Bit/Symbol Interleaving | Depth `d`. `interleave(16)` |
+| `manchester` | Manchester Encoding | - |
+| `nrzi` | Non-Return-to-Zero Inverted | - |
+| `varicode` | Varicode Encoding | Used in PSK31 |
+
+### 2.3. Layer 1: Modulation / Modem
+
+Intrinsic conversion of bits to baseband signals.
+
+**Frequency Shift Keying (FSK)**
+| Descriptor | Description | Parameters | Example |
+| :--- | :--- | :--- | :--- |
+| `afsk(b)` | Audio FSK | Baud `b` | `afsk(1200)` |
+| `fsk(b, d)` | FSK (Baseband) | Baud `b`, Deviation `d` | `fsk(9600, 4.8k)` |
+| `gfsk(b, d, [bt])`| Gaussian FSK | Baud `b`, Dev `d`, BT (opt) | `gfsk(9k6, 4k8, 0.5)` |
+| `mfsk(n, r)` | **M-ary FSK** | Tones `n`, Symbol Rate `r` | `mfsk(16, 31.25)`, `mfsk(8, 6.25)` |
+| `cpfsk(b, d)` | Continuous Phase FSK | Baud `b`, Dev `d` | `cpfsk(4800, 1.2k)` |
+
+**Phase Shift Keying (PSK)**
+*Note: Differential PSK is represented as `diff, bpsk(...)`.*
+
+| Descriptor | Description | Parameters | Example |
+| :--- | :--- | :--- | :--- |
+| `bpsk(b)` | Binary PSK | Baud `b` | `bpsk(1200)`, `bpsk(31.25)` |
+| `qpsk(b)` | Quadrature PSK | Baud `b` | `qpsk(1000)` |
+| `diff` | Differential Encoding | Applied before modulation | `diff, bpsk(31)` (DBPSK) |
+
+**Spread Spectrum & OFDM**
+| Descriptor | Description | Parameters | Example |
+| :--- | :--- | :--- | :--- |
+| `lora(sf, bw, cr)`| LoRa | SF, BW, CR (denominator) | `lora(12, 125k, 5)` |
+| `ofdm(n, bw)` | OFDM | Carriers `n`, Total BW `bw` | `ofdm(16, 2000)` |
+
+### 2.4. Layer 0: RF Transport
+
+| Descriptor | Description | Parameters | Example |
+| :--- | :--- | :--- | :--- |
+| `fm` | Frequency Modulation | Optional BW | `fm(12.5k)` |
+| `usb` | Upper Sideband | - | `usb` |
+| `lsb` | Lower Sideband | - | `lsb` |
+| `am` | Amplitude Modulation| - | `am` |
+| `cw` | Continuous Wave | - | `cw` |
+
+### 2.5. Physical Parameters (PHY)
+
+| Descriptor | Description | Unit / Format | Example |
+| :--- | :--- | :--- | :--- |
+| `freq(f)` | Center Frequency | Hz (Integer preferred) | `freq(435100000)`, `freq(435M1)` |
+| `off(o)` | Audio Offset | Hz | `off(1500)` |
+| `bw(w)` | Occupied Bandwidth | Hz | `bw(25000)`, `bw(25k)` |
 
 > [!NOTE]
-> In the hailing context, `h` encoding simply means HQFBP framing, ie CBOR + data as per the [HQFBP RFC](rfc.md).
-
-## Concept
-
-The announcement string is a comma-separated list of **descriptors**, aka encodings in HQFBP.
-The descriptors describe the stack from **Top to Bottom**.
-For a valid hail, one should be able to reconstruct the receiving chain by piping these descriptors.
-
-### Discovery and QSO Establishment
-
-#### Passive Discovery (Satellite/Beacon)
-1. Satellite/beacon transmits announcement on known frequency
-2. Ground stations receive announcement
-3. Stations configure receivers based on descriptor string
-4. Stations listen for data on announced frequency
-
-#### Active Hailing (Station-to-Station)
-1. Station A transmits announcement on hailing channel
-2. Station B receives announcement
-3. Station B acknowledges (optional, if bidirectional)
-4. Both stations QSY to working frequency
-5. Data exchange begins
-
-
-### Basic Syntax
-
-```
-layerN,layerN-1,...,layer0
-```
-
-## Standard Descriptors
-
-### 1. Application / Protocol Layer (L7-L2)
-
-These tags describe the high-level format, framing, or protocol stack.
-
-| Descriptor | Description |
-| :--- | :--- |
-| `hqfbp` | HQFBP Protocol |
-| `aprs` | Automatic Packet Reporting System |
-| `ax.25` | AX.25 Link Layer Framing |
-| `ccsds` | CCSDS Space Data Link Protocols (TM/TC/AOS) |
-| `ao40` | AO-40 Protocol (FUNcube, etc.) |
-| `usp` | U482C / Simple Protocol (GOMspace) |
-| `mobitex` | Mobitex Wireless Data |
-| `ft8` | WSJT-X FT8 Framing |
-| `js8` | JS8Call Framing |
-| `olivia` | Olivia Framing |
-| `winlink` | Winlink / RMS |
-| `pocsag` | POCSAG Paging Protocol |
-| `psk31` | Varicode / PSK31 Framing |
-| `rtty` | RTTY Baudot Framing |
-
-### 2. Coding, FEC & Scrambling Layer (L1.5)
-
-These tags describe operations on the bit/symbol stream before it hits the modem.
-Standard FEC schemes match those defined in the HQFBP RFC.
-
-| Descriptor | Description | Example |
-| :--- | :--- | :--- |
-| `scr(p, i)` | Additive Scrambler. `p` can be hex/bin (e.g. `0x1A9` or `0b110101001`), or string for table following table. Optional `i` (hex) sets LFSR seed. | `scr(g3ruh)`, `scr(0x1A9, 0xFF)` |
-| `asm(w)` | Attached Sync Marker (eg CCSDS is 0x1ACFFC1D). Optional hex sync word `w`. | `asm`, `asm(0x1ACFFC1D)` |
-| `rs(n, k)` | Reed-Solomon Error Correction. Block length `n`, data length `k`. | `rs(255, 223)` |
-| `ldpc(n, k)` | Low-Density Parity-Check FEC. Block length `n`, data length `k`. | `ldpc(174, 87)` |
-| `conv(k, r)` | Convolutional Coding (Constraint `k`, Rate `r`). | `conv(7, 1/2)` |
-| `golay` | Golay(24,12) code (often used with ASM). | `golay` |
-| `rq(l, m, r)` | RaptorQ (RFC 6330). Source length `l`, MTU `m`, repair `r`. | `rq(1024, 16, 0)` |
-| `crc(n)` | `n`-bit Cyclic Redundancy Check. | `crc(16)`, `crc(32)` |
-| `manchester` | Manchester encoding. | `manchester` |
-| `nrzi` | Non-Return-to-Zero Inverted. | `nrzi` |
-| `diff` | Differential Encoding (applied before modulation). | `diff, bpsk(b)` |
-
-#### 2.1. **Complete Polynomial Reference Table**
-
-| Name | Polynomial | Hex | Binary | Standard |
-|------|------------|-----|--------|----------|
-| `g3ruh` | $1+x^{12}+x^{17}$ | 0x21001 | 100001000000000001 | G3RUH 9600 |
-| `ccsds` | $1+x^3+x^5+x^7+x^8$ | 0x1A9 | 110101001 | CCSDS 131.0-B-3 |
-| `mobitex` | $1+x^{14}+x^{15}$ | 0xC001 | 1100000000000001 | Mobitex |
-
-### 3. Modulation / Symbol Mapping (L1 Modem)
-
-This defines how bits/symbols are converted to baseband signals (tones, phases).
-This is the **intrinsic** nature of the digimode.
-
-| Descriptor | Description | Parameters | Example |
-| :--- | :--- | :--- | :--- |
-| `afsk(b)` | Audio Frequency Shift Keying. | Baudrate `b` | `afsk(1200)` |
-| `fsk(b, d)` | Frequency Shift Keying (Baseband). | Baudrate `b`, Deviation in Hz `d` | `fsk(9600, 4.8k)` |
-| `cpfsk(b, d)` | Continuous-Phase FSK. | Baudrate `b`, Deviation in Hz `d` | `cpfsk(4800, 1.2k)` |
-| `gfsk(b, d, bt)` | Gaussian FSK (Smoothed CPFSK). | Baudrate `b`, Deviation in Hz `d`, BT product `bt` | `gfsk(9600, 4.8k, 0.5)` |
-| `bpsk(b)` | Binary Phase Shift Keying. | Baudrate `b` | `bpsk(31)`, `bpsk(1200)` |
-| `diff,bpsk(b)` | Differential BPSK | Baudrate `b` | `diff, bpsk(1000)` |
-| `qpsk(b)` | Quadrature PSK. | Baudrate `b` | `qpsk(31)` |
-| `diff,qpsk(b)` | Differential QPSK. | Baudrate `b` | `diff, qpsk(1000)` |
-| `mfsk(n, r)` | M-ary FSK. | Tones `n`, Symbol Rate `r` | `mfsk(16, 31.25)` |
-| `ofdm(n, bw)` | Orthogonal FDM. | Carriers `n`, Bandwidth in Hz `bw` | `ofdm(16, 2000)` |
-
-### 4. RF Transport Layer (L0)
-
-This defines how the baseband signal is put onto the RF carrier.
-
-| Descriptor | Description | Parameters | Example |
-| :--- | :--- | :--- | :--- |
-| `fm` | Frequency Modulation. | Deviation/BW (optional) | `fm`, `fm(12.5k)` |
-| `usb` | Upper Sideband. | - | `usb` |
-| `lsb` | Lower Sideband. | - | `lsb` |
-| `am` | Amplitude Modulation. | - | `am` |
-| `cw` | Continuous Wave. | - | `cw` |
-
-### 5. Physical Parameters (PHY)
-
-| Descriptor | Parameter | Example |
-| :--- | :--- | :--- |
-| `freq` | Center Frequency (Hz). | `freq(144M8)` |
-| `off` | Audio center offset (Hz). | `off(1k5)` |
-| `bw` | Bandwidth (Hz). | `bw(25k)` |
+> **Unit Notation**: 'k' = 1000 (kHz/kbps), 'M' = 1,000,000 (MHz).
+> Integers are preferred for compact CBOR encoding.
 
 ---
 
-## Examples of Decomposition
+## 3. Reference Tables
 
-### Classic APRS (VHF)
+### 3.1. Standard Polynomials
 
-APRS is just the app. The stack is AX.25, using NRZI, AFSK modulation, over FM.
+| Name | Polynomial | Hex | Binary | Standard |
+|------|------------|-----|--------|----------|
+| `g3ruh` | $1+x^{12}+x^{17}$ | 0x21001 | ...100001000000000001 | Packet 9600 |
+| `ccsds` | $1+x^3+x^5+x^7+x^8$ | 0x1A9 | 110101001 | CCSDS |
+| `mobitex`| $1+x^{14}+x^{15}$ | 0xC001 | 1100000000000001 | Mobitex |
 
-```
-aprs,ax.25,nrzi,afsk(1200),fm(12k5),freq(144M8)
-```
+### 3.2. Common Mode Translation Table
 
-### 9600 Baud Packet (G3RUH)
+| Common Name | Descriptor Deconstruction |
+| :--- | :--- |
+| **APRS (1200)** | `aprs, ax.25, nrzi, afsk(1200), fm, freq(144M8)` |
+| **Packet 9600** | `ax.25, scr(g3ruh), nrzi, gfsk(9k6, 4k8), fm` |
+| **FT8** | `ft8, ldpc(174,87), crc(14), mfsk(8, 6.25), usb` |
+| **LoRa (EU)** | `lora(12, 125k, 5), freq(433M775)` |
+| **PSK31** | `psk31, varicode, diff, bpsk(31.25), usb` |
+| **CubeSat (GOM)**| `ax.25, golay, asm(0x1ACFFC1D), scr(ccsds), fsk(9k6), fm` |
 
-"G3RUH" is a scrambler. The modulation is typically GFSK (or filtered FSK) with specific deviation.
 
-```
-aprs,ax.25,scr(g3ruh),nrzi,gfsk(9k6, 4k8),fm(25k),freq(437M5)
-```
 
-### FT8
+---
 
-FT8 uses LDPC(174,87), `crc(14)`, and 8-FSK modulation.
+## 4. Integration with HQFBP
 
-```
-ft8,ldpc(174,87),crc(14),mfsk(8, 6.25),usb,freq(14M074),off(1k5)
-```
+In HQFBP, these descriptors populate the `Content-Encoding` array.
 
-### RTTY (Classic)
+### 4.1. The Boundary Marker ("h", -1)
 
-baudot code, 45 baud, 170 Hz shift FSK.
-```
-rtty,fsk(45, 170),usb,freq(14M08)
-```
+The HQFBP stack is divided into two sections by the integer `-1` (or "h"):
 
-### PSK31
+1.  **Pre-boundary**: Encodings applied to the **File Payload** (e.g., source compression `gzip`, fountain codes `rq`).
+2.  **Post-boundary**: Encodings applied to the **HQFBP Message** itself (e.g., link-level FEC `rs`, scrambling `scr`, modulation).
 
-Varicode encoding, BPSK modulation at 31.25 baud.
+In the hailing context, it SHOULD be interpreted as the HQFBP framing.
 
-```
-psk31,varicode,bpsk(31.25),usb,freq(14M07),off(1k)
-```
+### 4.2. Example 1: Satellite Downlink (Announcement)
 
-### Olivia (8/250)
+**Context**: A satellite beaconing on 435.200 MHz.
+**Announcement Message Payload**:
 
-Olivia MFSK submode (8 tones, 250 Hz bandwidth). All standard Olivia submodes use 31.25 baud.
-
-```
-olivia,mfsk(8, 31.25),usb,freq(14M07),off(1k)
-```
-
-### POCSAG (Paging)
-
-POCSAG protocol, usually direct FSK (4.5kHz shift).
-
-```
-pocsag,fsk(1k2, 4k5),fm(25k),freq(439M9875)
-```
-
-### LoRa APRS (EU)
-
-Standard LoRa-APRS tracker configuration.
-
-```
-aprs,ax.25,lora(sf=12, bw=125k, cr=4/5),freq(433M775)
-```
-
-### RSID (Reed-Solomon Identification)
-
-The identification signal itself uses 16-tone MFSK.
-
-```
-rsid,mfsk(16, 10.766),usb,freq(14M07)
-```
-
-### gr-satellites: Generic CCSDS (BPSK)
-
-Common downlink format. CCSDS frames, Reed-Solomon(223, 255), Scrambled, BPSK.
-
-```
-ccsds,rs(255,223),scr(ccsds),bpsk(9k6),usb,freq(435M1)
-```
-
-### gr-satellites: GOMspace AX100 (ASM+Golay)
-
-Common on CubeSats.
-```
-ax.25,golay,asm(0x1ACFFC1D),scr(ccsds),fsk(9k6),fm,freq(437M425)
-```
-*Note: GOMspace often wraps AX.25 in ASM/Golay/Scrambler.*
-
-### gr-satellites: Mobitex
-
-```
-mobitex,scr(0xC001, 0x7FFF),fsk(4k8),fm,freq(435M5)
-```
-
-### HQFBP High Speed (Example)
-
-Using RS(255,223) FEC and G3RUH scrambling.
-
-```
-gzip,h,rs(255,223),scr(g3ruh),gfsk(19k2, 2k4),fm,freq(435M)
-```
-
-## Examples of Complete Announcement Exchanges
-
-### Scenario 1: CubeSat Downlink
-```
-[Satellite FOSM-1 transmits on 435.200 MHz USB]
-
-Announcement Message:
+```json
 {
   "0": 1001,
-  "1": "FOSM-1",
+  "1": "SAT-1",
   "4": "application/vnd.hqfbp+cbor",
-  "5": ["h", "rs(255,223)", "scr(ccsds)", "gfsk(9k6, 4k8)", "freq(435M2)"]
+  "5": [
+    -1,          // Protocol: HQFBP
+    "rs(255,223)",    // FEC: Reed-Solomon
+    "scr(ccsds)",     // Scrambler: CCSDS
+    "bpsk(9600)",     // Modulation: BPSK 9k6
+    "freq(435M2)"     // Tuning: 435.2 MHz
+  ]
 }
-
-[Ground stations receive announcement, configure decoders]
-[Satellite transmits data chunks using announced stack]
 ```
 
-### Scenario 2: HF Digital File Transfer
-```
-[Station F4XYZ on 14.074 MHz USB]
+**Interpretation**: To decode the *next* message (1001), the ground station must: Tune 435.2MHz → Demod BPSK 9600 → Descramble CCSDS → Decode RS → Parse CBOR.
 
-Announcement (transmitted once):
+### 4.3. Example 2: HF File Transfer (Hailing)
+
+**Context**: Reviewing an active hail on 14.074 MHz for a large file transfer.
+
+```json
 {
   "0": 2001,
-  "1": "F4XYZ",
-  "2": "QST-0",
+  "1": "CALLSIGN",
   "4": "application/vnd.hqfbp+cbor",
-  "5": ["hqfbp", "gzip", -1, "rq(1024,256,10)", "bpsk(125)", "usb", "freq(14.074)", "off(1500)"]
+  "5": [
+    "gzip",                // Source Compression
+    "rq(1024,128,0)",      // Fountain Code (Pre-boundary)
+    -1,                    // HQFBP Framing
+    "interleave(4)",       // Bit Interleaving
+    "conv(7, 1/2)",        // Convolutional Coding
+    "ofdm(18, 500)",       // Robust OFDM
+    "freq(14M075)"
+  ]
 }
-
-[Listening stations configure for RaptorQ fountain code reception]
-[F4XYZ transmits file chunks with RaptorQ encoding]
 ```
 
-## Regulatory Compliance
+## 5. Operational Recommendations
 
-### Station Identification
+### 5.1. Suggested Hailing Frequencies
 
-- Announcement messages MUST include `Src-Callsign` (CBOR key 1)
-- Callsign format: `CALL-SSID` (e.g., `F4XYZ-7`)
-- Identification interval: per local regulations (typically 10 minutes)
+To maximize discoverability, announcements should be made on known coordination channels.
+
+This is not yet part of the specification.
+
+### 5.2. Regulatory Compliance
+
+*   **Callsign**: All HQFBP announcements **MUST** include the `Src-Callsign` (Key 1) to satisfy identification regulations.
+*   **Bandwidth**: Announced `bw(),freq()` must comply with the band plan of the target frequency. Also the resulting $(freq-bw, freq+bw)$ be within the authorized band plan.
