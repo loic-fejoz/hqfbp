@@ -61,7 +61,7 @@ To achieve maximum header compression, HQFBP mandates the use of short integer k
 | 2 | **Dst-Callsign** | Text String (UTF-8) | OPTIONAL | Intended recipient (may be a broadcast address like QST-0). |
 | 3 | **Content-Format** | Unsigned Integer | OPTIONAL | CoAP Content-Format ID (e.g., 0 for text/plain;charset=UTF-8) [3] . Mutually exclusive with 5. |
 | 4 | **Content-Type** | Text String (UTF-8) | OPTIONAL | Full HTTP-style MIME type (alternative to 4). Mutually exclusive with 4. |
-| 5 | **Content-Encoding** | Text String or Array of Text Strings (UTF-8) | OPTIONAL | Compression/Encoding applied to the original file or chunk. If an Array, encodings MUST be applied in the order listed. |
+| 5 | **Content-Encoding** | Text String, Integer, or Array | OPTIONAL | Compression/Encoding applied to the original file or chunk. If an Array, encodings MUST be applied in the order listed. Parameterized encodings can be compacted as nested lists. |
 | 6 | **Repr-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **original, uncompressed** file content (e.g., SHA-256, CRC32). |
 | 7 | **Content-Digest** | Byte String | OPTIONAL | Hash or Checksum of the **encoded/compressed** payload (e.g., SHA-256, CRC32). |
 | 8 | **File-Size** | Unsigned Integer | OPTIONAL | Total size of the original, uncompressed file in bytes. **Required** for chunked transfers. |
@@ -105,35 +105,110 @@ The final, fully decoded header of the reconstructed file MUST be the merge of a
 ### 6.1. Compression (Content-Encoding)
 
 The Content-Encoding field specifies the compression and/or forward error correction (FEC) algorithm applied to the original data *before* and/or *after* chunking.  
-The value of Content-Encoding MAY be a single Text String or an **Array of Text Strings**. If it is an Array, the encodings MUST be applied sequentially, in the order they appear in the Array. Receivers MUST sequentially undo these encodings in the reverse order.  
+The value of Content-Encoding MAY be a single Text String, an Integer (referencing the registry below), or an **Array**. If it is an Array, the encodings MUST be applied sequentially, in the order they appear in the Array. Receivers MUST sequentially undo these encodings in the reverse order.  
+
+To further compact parameterized encodings, they MAY be represented as a nested list where the first element is the integer ID from the registry and subsequent elements are the parameters. For instance, `rs(255, 233)` can be compacted as `[7, 255, 233]`. This allows the `Content-Encoding` field to be a nested list (e.g., `["gzip", [7, 255, 233]]`).
+
 Common values include standard compression schemes like `gzip`, `deflate`, `br`, or `lzma`. This field also supports forward error correction (FEC) schemes relevant to noisy radio environments, such as Fountain Codes (e.g., RaptorQ as per IETF RFC 6330 [[2]](https://datatracker.ietf.org/doc/html/rfc6330)), and other erasure codes like **LDPC** or **Reed-Solomon** (eg `rs(255,233)`).
 
 To minimize overhead, well-known encodings SHOULD use their assigned integer values.
 
 #### 6.1.1. Well-Known Encoding Registry
 
-| Integer Value | Algorithm Name | Description |
-| :--- | :--- | :--- |
-| -1 | h (Boundary) | Header Boundary Marker. See Section 6.1.2. |
-| 0 | identity | No encoding applied. |
-| 1 | gzip | Gzip compression (RFC 1952). |
-| 2 | deflate | Deflate compression (RFC 1951). |
-| 3 | br | Brotli compression. |
-| 4 | lzma | Lempel-Ziv-Markov chain algorithm compression. |
-| 5 | crc16 | 16bits cyclic redundancy check appended after data |
-| 6 | crc32 | 32bits cyclic redundancy check appended after data |
-| - | rs(n,k) | Reed-Solomon Error Correction. |
-| - | rq(l,m,r) | RaptorQ (RFC 6330) with length `l`, MTU `m`, and repair `r`. |
-| - | conv(k,r) | Convolutional coding with constraint `k` and rate `r`. |
-| - | scr(poly) | Additive Scrambler using given LFSR polynomial mask. |
-| - | chunk(s) | Reassembly Marker: Chunk with size `s`. |
-| - | repeat(k) | Reassembly Marker: Simple repetition `k` times. |
+| ID | Descriptor | Description | Parameters / Notes |
+| :--- | :--- | :--- | :--- |
+| -1 | h | `hqfbp` Header Boundary Marker | See Section 6.1.2. |
+| 0 | identity | No encoding applied | - |
+| 1 | gzip | Gzip compression | RFC 1952 |
+| 2 | deflate | Deflate compression | RFC 1951 |
+| 3 | br | Brotli compression | - |
+| 4 | lzma | LZMA compression | - |
+| 5 | crc16 | 16-bit CRC | Appended after data |
+| 6 | crc32 | 32-bit CRC | Appended after data |
+| 7 | rs(n,k) | Reed-Solomon | Block length `n`, data length `k` |
+| 8 | rq(l,m,r) | RaptorQ | Source length `l`, MTU `m`, repair `r` |
+| 9 | conv(k,r) | Convolutional coding | Constraint length `k`, rate `r` |
+| 10 | scr(p,i) | Additive Scrambler | Polynomial mask `p` can be hex/bin (e.g. `0x1A9` or `0b110101001` for CCSDS), optional seed `i` (hex) sets LFSR seed. |
+| 11 | chunk(s) | Reassembly Marker | Chunk with size `s` |
+| 12 | repeat(k) | Reassembly Marker | Simple repetition `k` times |
+| 13 | lora(sf,bw,cr) | LoRa Spread Spectrum | Spread Factor `sf`, Bandwidth in Hz `bw`, Rate `cr` |
+| 14 | ldpc(n,k) | LDPC FEC | Block length `n`, data length `k` |
+| 15 | golay | Golay(24,12) code | - |
+| 16 | manchester | Manchester encoding | - |
+| 17 | nrzi | NRZI encoding | Non-Return-to-Zero Inverted |
+| 18 | diff | Differential Encoding | - |
+| 19 | interleave(d) | Interleaving | Interleaving depth `d` |
+| 20 | preamble(p,l) | Preamble sequence | Pattern `p`, length `l` |
+| 21 | sync(w) | Sync word | Hex pattern `w` |
+| 22 | crc(n) | `n`-bit CRC | e.g. `crc(14)` is used in FT8 |
+| 23 | afsk(b) | AFSK Modulation | Baudrate `b` |
+| 24 | fsk(b,d) | FSK Modulation | Baudrate `b`, deviation in Hz `d` |
+| 25 | cpfsk(b,d) | Continuous-Phase FSK | Baudrate `b`, deviation in Hz `d` |
+| 26 | gfsk(b,d,bt) | Gaussian FSK | Baudrate `b`, deviation in Hz `d`, filter BT `bt` |
+| 27 | bpsk(b) | BPSK Modulation | Baudrate `b` |
+| 28 | qpsk(b) | QPSK Modulation | Baudrate `b` |
+| 29 | mfsk(n,r) | M-ary FSK | Tones `n`, symbol rate `r` |
+| 30 | ofdm(n,bw) | Orthogonal FDM | Carriers `n`, bandwidth in Hz `bw` |
+| 31 | fm(bw) | Frequency Modulation | Optional deviation/bandwidth in Hz `bw` |
+| 32 | usb | Upper Sideband | - |
+| 33 | lsb | Lower Sideband | - |
+| 34 | am | Amplitude Modulation | - |
+| 35 | cw | Continuous Wave | - |
+| 36 | freq(f) | Center Frequency | Center Frequency in Hz `f` (integer preferred) |
+| 37 | off(o) | Audio center offset | Audio center offset in Hz `o` (integer) |
+| 38 | bw(bw) | Bandwidth | Occupied bandwidth in Hz `bw` (integer preferred) |
+| 39 | hqfbp | HQFBP Protocol | - |
+| 40 | aprs | APRS Protocol | - |
+| 41 | ax.25 | AX.25 Link Layer | - |
+| 42 | ccsds | CCSDS Protocols | - |
+| 43 | ao40 | AO-40 Protocol | FUNcube, etc. |
+| 44 | usp | USP / Simple Protocol | GOMspace |
+| 45 | mobitex | Mobitex Wireless Data | - |
+| 46 | ft8 | FT8 Framing | WSJT-X |
+| 47 | js8 | JS8Call Framing | - |
+| 48 | olivia | Olivia Framing | - |
+| 49 | winlink | Winlink / RMS | - |
+| 50 | pocsag | POCSAG Paging | - |
+| 51 | psk31 | PSK31 Framing | - |
+| 52 | rtty | RTTY Baudot Framing | - |
+| 53 | varicode | Varicode encoding | Used in PSK31 |
+| 54 | asm(w) | Attached Sync Marker | Optional hex sync word `w` |
+
+> [!NOTE]
+> Differential modulations (e.g., DBPSK or DQPSK) are not assigned separate IDs. They MUST be represented by applying `diff` (34) followed by the base modulation:
+> - `dbpsk(baud) ≡ [34, [43, baud]]`
+> - `dqpsk(baud) ≡ [34, [44, baud]]`
+
+> [!NOTE]
+> - `scr(g3ruh)` is $1+x^{12}+x^{17}$.
+> - `scr(ccsds)` is $1+x^3+x^5+x^7+x^8$ thus `scr(0x1A9, 0xFF)`.
+
+#### 6.1.3. Unit Notation and Encoding Recommendations
+
+To ensure interoperability and minimize CBOR overhead, the following conventions and recommendations apply:
+
+**Standard Unit Notation (Human Readable Text)**
+
+When representing parameters as text strings (e.g., in `Content-Encoding: ["fsk(9k6, 4k8)"]`), the following suffixes MUST be used:
+- `k`: kHz (for frequencies) or kbps/baud (for data rates). Example: `9k6` = 9600.
+- `M`: MHz. Example: `144M8` = 144.8 MHz.
+
+The interpretation of these suffixes is determined by the context of the descriptor (e.g., frequency vs. baud rate).
+
+**Compact Encoding Recommendations**
+
+To minimize transmission size, transmitters SHOULD avoid using floating-point numbers in CBOR-encoded descriptors, as CBOR floats (especially double precision) require significantly more bytes (typically 9 bytes) than small integers.
+
+- **Frequencies:** SHOULD be encoded in **Hz** as integers instead of **MHz** as floats.
+    - *Example (144.8 MHz):* Use `144800000` or `144M8` instead of `144.8`.
+- **Baud rates and Deviations:** SHOULD be encoded as integers.
+    - *Example (9600 baud):* Use `9600` or `9k6`.
 
 #### 6.1.2. The Header Boundary Marker (-1)
 
 The integer `-1` (represented as `"h"` in documentation) acts as a structural boundary in the encoding array:
 
-Pre-Boundary: Encodings applied only to the File Payload before protocol encapsulation.
+Pre-Boundary: Encodings applied only to the File Payload before HQFBP protocol encapsulation.
 
 Post-Boundary: Encodings applied to the HQFBP Message (Header + Payload).
 
@@ -240,7 +315,7 @@ This message is sent using standard transparent CBOR. Its payload contains the s
 |-|-|-|
 | Header: Message-Id |	1001 |	The ID of the announcement itself.|
 | Header: Content-Type | application/vnd.hqfbp+cbor |	Tells the receiver: "The payload is a header for a future message." |
-| Payload (CBOR Map)	| ```{0: 1002, 5: [-1, "ldpc", "rs(255,233)"]}``` |Metadata for the upcoming Message 1002. |
+| Payload (CBOR Map)	| ```{0: 1002, 5: [-1, "ldpc", [7, 255, 233]]}``` |Metadata for the upcoming Message 1002. |
 
 ### C.2. Step 2: The Encapsulated File Transfer (Message 1002)
 

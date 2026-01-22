@@ -36,6 +36,10 @@ To help radio amateurs understand where HQFBP fits in the ecosystem, here is how
 
 Both have a simulator to stress-test the protocol under various bit error rate (BER) conditions of the communication link. They also have utility tools to send/receive files by connecting to a KISS-over-tcp server, like Direwolf and FLDIGI.
 
+## Usage as a Hailing Protocol
+
+The HQFBP protocol can be used as a hailing protocol, as described in [HAILING.md](./HAILING.md). The hailing protocol is used to announce the protocol stack to be used for the communication link on a given frequency.
+
 ## License
 
 See [LICENSE](./LICENSE) for details.
