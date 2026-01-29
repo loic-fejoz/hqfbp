@@ -11,6 +11,8 @@ Specifically, it defines the values used in the `Content-Encoding` (CBOR Key 5) 
 
 While designed for HQFBP, this descriptor syntax is generic and philosophies of **Explicit Decomposition** make it suitable for describing any amateur radio digital mode.
 
+This concept matches the idea of **Cognitive Radio** as thought by Joseph Mitola. In his vision, a cognitive radio is an intelligent system aware of its environment and capable of dynamically adapting its transmission parameters—such as frequency, modulation, and error correction—to optimize communication. By treating the radio protocol stack as a set of explicitly declared, composable blocks rather than a fixed monolithic standard, this descriptor syntax enables receivers to automatically reconfigure their signal processing chains. This moves us closer to the ideal of a radio that can understand and adapt to new modes on the fly, rather than relying on static, pre-programmed configurations.
+
 ### 1.1. The Philosophy: Explicit Decomposition
 
 Traditional amateur radio modes are often named as monolithic entities (e.g., "Packet Radio", "FT8", "Olivia"). This specification breaks these composite modes down into their constituent layers:
@@ -43,6 +45,7 @@ Tags describing the high-level format or link-layer protocol.
 | `psk31` | PSK31 / Varicode Framing | - |
 | `rtty` | RTTY / Baudot Framing | - |
 | `usp` | U482C / Simple Protocol | GOMspace |
+| `il2p` | IL2P Link Layer Protocol | - |
 
 ### 2.2. Layer 1.5: Coding, FEC, Scrambling & Framing
 
@@ -62,6 +65,8 @@ Operations on the bit/symbol stream.
 | `manchester` | Manchester Encoding | - |
 | `nrzi` | Non-Return-to-Zero Inverted | - |
 | `varicode` | Varicode Encoding | Used in PSK31 |
+| `bstuff(n)` | Bit Stuffing | Insert 0 after `n` 1s. `bstuff`, `bstuff(5)` |
+| `post_asm(w)` | Trailer Sync Marker | `w` (hex). `post_asm(0x7E)` |
 
 ### 2.3. Layer 1: Modulation / Modem
 
@@ -124,17 +129,21 @@ Intrinsic conversion of bits to baseband signals.
 | `g3ruh` | $1+x^{12}+x^{17}$ | 0x21001 | ...100001000000000001 | Packet 9600 |
 | `ccsds` | $1+x^3+x^5+x^7+x^8$ | 0x1A9 | 110101001 | CCSDS |
 | `mobitex`| $1+x^{14}+x^{15}$ | 0xC001 | 1100000000000001 | Mobitex |
+| `il2p` | $1+x^{14}+x^{15}$ | 0xC001 | 1100000000000001 | IL2P |
 
 ### 3.2. Common Mode Translation Table
 
 | Common Name | Descriptor Deconstruction |
 | :--- | :--- |
-| **APRS (1200)** | `aprs, ax.25, nrzi, afsk(1200), fm, freq(144M8)` |
-| **Packet 9600** | `ax.25, scr(g3ruh), nrzi, gfsk(9k6, 4k8), fm` |
+| **APRS (1200)** | `aprs, ax.25, crc16, bstuff, asm(0x7E), post_asm(0x7E), nrzi, afsk(1200), fm, freq(144M8)` |
+| **Packet 9600** | `ax.25, scr(0x21001), nrzi, gfsk(9k6, 4k8), fm` |
 | **FT8** | `ft8, ldpc(174,87), crc(14), mfsk(8, 6.25), usb` |
 | **LoRa (EU)** | `lora(12, 125k, 5), freq(433M775)` |
 | **PSK31** | `psk31, varicode, diff, bpsk(31.25), usb` |
 | **CubeSat (GOM)**| `ax.25, golay, asm(0x1ACFFC1D), scr(ccsds), fsk(9k6), fm` |
+| **AX.25 (Expl.)**| `ax.25, crc16, bstuff, asm(0x7E), post_asm(0x7E), nrzi, ...` |
+| **FX.25 (Tag 01)**| `ax.25, rs(255,239), asm(0xB74DB7DF8A532F3E), post_asm(0x7E)` |
+| **IL2P** | `il2p, rs(255,223), asm(0xF15E48)` |
 
 
 
@@ -164,7 +173,7 @@ In the hailing context, it SHOULD be interpreted as the HQFBP framing.
   "1": "SAT-1",
   "4": "application/vnd.hqfbp+cbor",
   "5": [
-    -1,          // Protocol: HQFBP
+    "h",          // Protocol: HQFBP
     "rs(255,223)",    // FEC: Reed-Solomon
     "scr(ccsds)",     // Scrambler: CCSDS
     "bpsk(9600)",     // Modulation: BPSK 9k6
@@ -187,7 +196,7 @@ In the hailing context, it SHOULD be interpreted as the HQFBP framing.
   "5": [
     "gzip",                // Source Compression
     "rq(1024,128,0)",      // Fountain Code (Pre-boundary)
-    -1,                    // HQFBP Framing
+    "h"                    // HQFBP Framing
     "interleave(4)",       // Bit Interleaving
     "conv(7, 1/2)",        // Convolutional Coding
     "ofdm(18, 500)",       // Robust OFDM

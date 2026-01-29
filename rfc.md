@@ -173,6 +173,9 @@ To minimize overhead, well-known encodings SHOULD use their assigned integer val
 | 52 | rtty | RTTY Baudot Framing | - |
 | 53 | varicode | Varicode encoding | Used in PSK31 |
 | 54 | asm(w) | Attached Sync Marker | Optional hex sync word `w` |
+| 55 | bstuff(n) | Bit Stuffing | Insert 0 after `n` consecutive 1s (default n=5 for HDLC) |
+| 56 | post_asm(w) | Post-Attached Sync Marker | Trailer sync word `w` |
+| 57 | il2p | IL2P Protocol | IL2P Link Layer Protocol Framing |
 
 > [!NOTE]
 > Differential modulations (e.g., DBPSK or DQPSK) are not assigned separate IDs. They MUST be represented by applying `diff` (34) followed by the base modulation:
