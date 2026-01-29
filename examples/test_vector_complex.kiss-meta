@@ -1,0 +1,22 @@
+{
+  "encodings": [
+    "gzip",
+    "h",
+    "crc32"
+  ],
+  "header": {
+    "8": 82,
+    "1": "N0CALL",
+    "0": 1,
+    "5": [
+      "gzip",
+      "h",
+      "crc32"
+    ],
+    "12": 95
+  },
+  "payload_len": 82,
+  "pdus_count": 1,
+  "kiss_len": 124,
+  "original_md5": "bd228f497efa76731ffd2cf0046080a1"
+}

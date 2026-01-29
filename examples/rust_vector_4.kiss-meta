@@ -1,0 +1,21 @@
+{
+  "encodings": [
+    "rq(109,68,1)",
+    "crc32",
+    "h",
+    "rs(120,112)",
+    "conv(7,1/2)"
+  ],
+  "header": {
+    "0": 1,
+    "1": "N0CALL",
+    "4": "application/vnd.hqfbp+cbor",
+    "5": "h",
+    "8": 56,
+    "12": 56
+  },
+  "payload_len": 56,
+  "pdus_count": 4,
+  "kiss_len": 1568,
+  "original_md5": "0d7e3af3ebec489fb5b7e4c9d0d07be3"
+}

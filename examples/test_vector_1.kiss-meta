@@ -1,0 +1,16 @@
+{
+  "encodings": [
+    "h"
+  ],
+  "header": {
+    "8": 12,
+    "1": "N0CALL",
+    "0": 1,
+    "5": "h",
+    "12": 12
+  },
+  "payload_len": 12,
+  "pdus_count": 1,
+  "kiss_len": 32,
+  "original_md5": "16ca78f74cbbe1c3c17e60528eae3f71"
+}
