@@ -21,6 +21,8 @@ To help radio amateurs understand where HQFBP fits in the ecosystem, here is how
 | **PACTOR** | Connected Mode / ARQ | **Broadcast (Connectionless):** PACTOR is primarily a connected mode protocol (Auto-Repeat Request), requiring a handshake. HQFBP is a **broadcasting** protocol (FEC/Erasure coding supported), meaning one station transmits and *many* can receive simultaneously without a back-channel. |
 | **WINLINK** | Email / Message System | **Transport Layer:** Winlink is a full global email system. HQFBP is a lighter-weight **transport layer** focused on the efficient delivery of a single file or message. HQFBP could theoretically be used as a transport *for* a system like Winlink. |
 | **PACSAT** | File Broadcasting (AX.25/UI) | **Modern Evolution:** PACSAT (PFT) pioneered file broadcasting for early Microsats using AX.25 UI frames. HQFBP evolves this by being transport-agnostic, using CBOR for extensible, high-efficiency headers and supporting modern erasure coding (RaptorQ/RS) for better recovery without a back-channel. |
+| **D-Star DV** | Digital Voice (Fast Data) | **Data Priority:** D-Star DV handles slow data (1.2 kbps) alongside voice, or repurposes voice bits for "Fast Data". HQFBP is designed for flexible, high-efficiency data broadcasting across any link without being tied to specific hardware protocols, allowing better performance on variable-quality channels. |
+
 
 ## 🚀 Key Features
 

@@ -46,6 +46,11 @@ Tags describing the high-level format or link-layer protocol.
 | `rtty` | RTTY / Baudot Framing | - |
 | `usp` | U482C / Simple Protocol | GOMspace |
 | `il2p` | IL2P Link Layer Protocol | - |
+| `varac` | VaraC Chat & File Protocol | - |
+| `m17` | M17 Digital Radio Protocol | - |
+| `npr` | New Packet Radio Protocol | - |
+| `dstar` | D-Star Digital Voice & Data | - |
+
 
 ### 2.2. Layer 1.5: Coding, FEC, Scrambling & Framing
 
@@ -80,6 +85,8 @@ Intrinsic conversion of bits to baseband signals.
 | `gfsk(b, d, [bt])`| Gaussian FSK | Baud `b`, Dev `d`, BT (opt) | `gfsk(9k6, 4k8, 0.5)` |
 | `mfsk(n, r)` | **M-ary FSK** | Tones `n`, Symbol Rate `r` | `mfsk(16, 31.25)`, `mfsk(8, 6.25)` |
 | `cpfsk(b, d)` | Continuous Phase FSK | Baud `b`, Dev `d` | `cpfsk(4800, 1.2k)` |
+| `gmsk(b)` | Gaussian MSK | Baud `b` | `gmsk(4800)` |
+
 
 **Phase Shift Keying (PSK)**
 *Note: Differential PSK is represented as `diff, bpsk(...)`.*
@@ -141,9 +148,15 @@ Intrinsic conversion of bits to baseband signals.
 | **LoRa (EU)** | `lora(12, 125k, 5), freq(433M775)` |
 | **PSK31** | `psk31, varicode, diff, bpsk(31.25), usb` |
 | **CubeSat (GOM)**| `ax.25, golay, asm(0x1ACFFC1D), scr(ccsds), fsk(9k6), fm` |
-| **AX.25 (Expl.)**| `ax.25, crc16, bstuff, asm(0x7E), post_asm(0x7E), nrzi, ...` |
+| **AX.25 (Expl.)**| `chunk(256), ax.25, crc16, bstuff, asm(0x7E), post_asm(0x7E), nrzi, ...` |
 | **FX.25 (Tag 01)**| `ax.25, rs(255,239), asm(0xB74DB7DF8A532F3E), post_asm(0x7E)` |
 | **IL2P** | `il2p, rs(255,223), asm(0xF15E48)` |
+| **VaraC (HF)** | `varac, h, turbo, ofdm(52, 37.5), bw(2400), usb` |
+| **WA4DSY (56k)** | `ax.25, scr(0x21001), nrzi, fsk(56k, 28k), fm` |
+| **D-Star DV (Fast)** | `dstar, scr(0x8003), gmsk(4800), fm` |
+| **M17 (Text)** | `m17, conv(7, 1/2), interleave, mfsk(4, 4800), fm` |
+| **NPR** | `npr, xor(3,1), scr(0x221), mfsk(4, 500k), fm` |
+
 
 
 
