@@ -2,7 +2,7 @@
 
 The **Hamradio Quick File Broadcasting Protocol (HQFBP)** is designed to enable efficient, robust, and asynchronous file and data broadcasting over radio communication links. It is particularly optimized for challenging environments such as satellite downlinks, leveraging **CBOR (RFC 8949)** for compact headers and minimizing overhead.
 
-For the full technical specification, please refer to [rfc.md](./rfc.md).
+For the full technical specification, please refer to [RFC](./RFC.md).
 
 ## 🛰️ FOSM-1 Mission Context
 

@@ -33,7 +33,7 @@ Tags describing the high-level format or link-layer protocol.
 
 | Descriptor | Description | Reference |
 | :--- | :--- | :--- |
-| `h` | HQFBP Protocol | [HQFBP RFC](rfc.md) |
+| `h` | HQFBP Protocol | [HQFBP RFC](RFC.md) |
 | `aprs` | Automatic Packet Reporting System | APRS Spec 1.0 |
 | `ax.25` | AX.25 Link Layer Framing | AX.25 2.2 |
 | `ccsds` | CCSDS Space Data Link Protocols | TM/TC/AOS |
