@@ -73,6 +73,9 @@ Operations on the bit/symbol stream.
 | `bstuff(n)` | Bit Stuffing | Insert 0 after `n` 1s. `bstuff`, `bstuff(5)` |
 | `post_asm(w)` | Trailer Sync Marker | `w` (hex). `post_asm(0x7E)` |
 
+> [!NOTE]
+> When `post_asm` and `asm` are both used, `post_asm` **SHOULD** precede `asm`. This order allows `post_asm` to retrieve the actual frame's length at decoding time.
+
 ### 2.3. Layer 1: Modulation / Modem
 
 Intrinsic conversion of bits to baseband signals.
@@ -142,14 +145,14 @@ Intrinsic conversion of bits to baseband signals.
 
 | Common Name | Descriptor Deconstruction |
 | :--- | :--- |
-| **APRS (1200)** | `aprs, ax.25, crc16, bstuff, asm(0x7E), post_asm(0x7E), nrzi, afsk(1200), fm, freq(144M8)` |
+| **APRS (1200)** | `aprs, ax.25, crc16, bstuff, post_asm(0x7E), asm(0x7E),nrzi, afsk(1200), fm, freq(144M8)` |
 | **Packet 9600** | `ax.25, scr(0x21001), nrzi, gfsk(9k6, 4k8), fm` |
 | **FT8** | `ft8, ldpc(174,87), crc(14), mfsk(8, 6.25), usb` |
 | **LoRa (EU)** | `lora(12, 125k, 5), freq(433M775)` |
 | **PSK31** | `psk31, varicode, diff, bpsk(31.25), usb` |
 | **CubeSat (GOM)**| `ax.25, golay, asm(0x1ACFFC1D), scr(ccsds), fsk(9k6), fm` |
-| **AX.25 (Expl.)**| `chunk(256), ax.25, crc16, bstuff, asm(0x7E), post_asm(0x7E), nrzi, ...` |
-| **FX.25 (Tag 01)**| `ax.25, rs(255,239), asm(0xB74DB7DF8A532F3E), post_asm(0x7E)` |
+| **AX.25 (Expl.)**| `chunk(256), ax.25, crc16, bstuff, post_asm(0x7E), asm(0x7E), nrzi, ...` |
+| **FX.25 (Tag 01)**| `ax.25, rs(255,239), post_asm(0x7E), asm(0xB74DB7DF8A532F3E)` |
 | **IL2P** | `il2p, rs(255,223), asm(0xF15E48)` |
 | **VaraC (HF)** | `varac, h, turbo, ofdm(52, 37.5), bw(2400), usb` |
 | **WA4DSY (56k)** | `ax.25, scr(0x21001), nrzi, fsk(56k, 28k), fm` |
